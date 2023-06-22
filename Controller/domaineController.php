@@ -20,6 +20,17 @@ class DomainesController
         $this->fileUrl = $fileUrl;
         $this->logFile = $logFile;
     }
+    function extractDateFromUrl($url)
+    {
+        $filename = basename($url);
+        $dateString = substr($filename, 0, 8); // Extract the first 8 characters as the date string
+        $year = substr($dateString, 0, 4);
+        $month = substr($dateString, 4, 2);
+        $day = substr($dateString, 6, 2);
+        $date = "$year-$month-$day";
+        
+        return $date;
+    }
 
     public function writeLog($message)
     {
@@ -28,31 +39,40 @@ class DomainesController
         file_put_contents($this->logFile, $logEntry, FILE_APPEND);
     }
 
-    public function extractDomain($url)
+    public function extractDomain($domain)
     {
-        $url = str_replace('.fr', '', $url);
-        $domainParts = explode('.', $url);
+        $domain = str_replace('.fr', '', $domain);
+        $domainParts = explode('.', $domain);
 
         if (count($domainParts) >= 2) {
             return $domainParts[count($domainParts) - 2] . '.' . $domainParts[count($domainParts) - 1];
         }
 
-        return $url;
+        return $domain;
     }
 
-    public function processFileContent()
+    public function processFileContent($date = null)
     {
+        // Get the current date minus one day if no date is provided
+        if ($date === null) {
+            $currentDate = date('Ymd', strtotime('-1 day'));
+        } else {
+            $currentDate = $date;
+        }
+
+        // Construct the URL with the dynamic date
+        $url = 'https://www.example.com/files/' . $currentDate . '.txt';
+
         $client = new Client();
-        $response = $client->get($this->fileUrl);
+        $response = $client->get($url); // Use the dynamic URL
         $fileContent = $response->getBody();
 
         $lines = explode("\n", $fileContent);
         foreach ($lines as $line) {
-            $url = trim($line);
-            $domain = $this->extractDomain($url);
-            $date = date('Y-m-d');
+            $domain = $this->extractDomain(trim($line));
+            $date = $this->extractDateFromUrl($url); // Use the dynamic URL
 
-            $stmt = $this->db->prepare('SELECT COUNT(*) FROM domaines WHERE nom = :domain AND date = :date');
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM domaines WHERE nom = :domain AND date = :date");
             $stmt->bindValue(':domain', $domain);
             $stmt->bindParam(':date', $date);
             $stmt->execute();
@@ -68,7 +88,7 @@ class DomainesController
                 echo 'Script executed successfully!';
             } else {
                 $this->writeLog("Skipping duplicate domain: $domain, Date: $date");
-                echo 'Script failed!';
+                echo 'Script skipped!';
             }
         }
     }
