@@ -1,0 +1,6 @@
+{
+    "require": {
+        "monolog/monolog": "^3.3",
+        "guzzlehttp/guzzle": "^7.7"
+    }
+}
